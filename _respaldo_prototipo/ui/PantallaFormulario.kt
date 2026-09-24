@@ -4,24 +4,25 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -58,11 +58,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
@@ -72,8 +73,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.campusmarket.data.Producto
-import kotlinx.coroutines.launch
-import java.util.Locale
 
 private val FORMATO_PRECIO = Regex("^\\d+([.,]\\d{1,2})?\$")
 
@@ -84,7 +83,6 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
 
     val esEdicion = productoId != 0
     val context = LocalContext.current
-    val alcance = rememberCoroutineScope()
 
     // Estado: producto seleccionado (solo cuando se edita)
     LaunchedEffect(productoId) { vm.seleccionar(if (esEdicion) productoId else null) }
@@ -98,7 +96,7 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
     var precio by rememberSaveable { mutableStateOf("") }
     var stock by rememberSaveable { mutableStateOf("") }
     var disponible by rememberSaveable { mutableStateOf(true) }
-    var fotoTemporal by rememberSaveable { mutableStateOf<String?>(null) }
+    var nuevaFoto by rememberSaveable { mutableStateOf<Bitmap?>(null) }
     var expandido by remember { mutableStateOf(false) }
 
     // Si es edicion, los datos se cargan una sola vez cuando Room los entrega
@@ -108,7 +106,7 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
             nombre = existente.nombre
             descripcion = existente.descripcion
             categoria = existente.categoria
-            precio = String.format(Locale.US, "%.2f", existente.precio)
+            precio = existente.precio.toString()
             stock = existente.stock.toString()
             disponible = existente.disponible
             cargado = true
@@ -147,74 +145,41 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
         esEdicion && existente == null -> false
         existente != null ->
             nombre != existente.nombre || descripcion != existente.descripcion ||
-                categoria != existente.categoria ||
-                precio != String.format(Locale.US, "%.2f", existente.precio) ||
+                categoria != existente.categoria || precio != existente.precio.toString() ||
                 stock != existente.stock.toString() || disponible != existente.disponible ||
-                fotoTemporal != null
+                nuevaFoto != null
         else ->
             nombre.isNotBlank() || descripcion.isNotBlank() || categoria.isNotBlank() ||
-                precio.isNotBlank() || stock.isNotBlank() || fotoTemporal != null
+                precio.isNotBlank() || stock.isNotBlank() || nuevaFoto != null
     }
     var mostrarDescartar by rememberSaveable { mutableStateOf(false) }
-    val salir: () -> Unit = {
-        if (hayCambios) {
-            mostrarDescartar = true
-        } else {
-            onVolver()
-        }
-    }
+    val salir: () -> Unit = { if (hayCambios) mostrarDescartar = true else onVolver() }
     BackHandler(enabled = hayCambios) { mostrarDescartar = true }
 
-    // Estado: camara, galeria y permiso
+    // Estado: camara y permiso
     var mostrarExplicacion by rememberSaveable { mutableStateOf(false) }
-    var mensajeAviso by rememberSaveable { mutableStateOf<String?>(null) }
+    var mensajePermiso by rememberSaveable { mutableStateOf<String?>(null) }
     var permisoDenegado by rememberSaveable { mutableStateOf(false) }
 
-    val camaraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) {
-            alcance.launch { fotoTemporal = vm.guardarFotoTemporal(bitmap) }
-        }
-    }
-    // La galeria no necesita permiso: usa el selector de fotos del sistema
-    val galeriaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            alcance.launch {
-                val ruta = vm.guardarFotoTemporalDesdeUri(uri)
-                if (ruta != null) {
-                    fotoTemporal = ruta
-                } else {
-                    permisoDenegado = false
-                    mensajeAviso = "No se pudo cargar la imagen. Intenta con otra foto."
-                }
-            }
-        }
+    val camaraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { resultado ->
+        if (resultado != null) nuevaFoto = resultado
     }
     val lanzarCamara: () -> Unit = {
         try {
             camaraLauncher.launch(null)
         } catch (e: ActivityNotFoundException) {
-            permisoDenegado = false
-            mensajeAviso = "No se encontró una aplicación de cámara. Puedes continuar sin foto."
+            mensajePermiso = "No se encontró una aplicación de cámara. Puedes continuar sin foto."
         }
     }
     val permisoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
         if (concedido) {
-            mensajeAviso = null
+            mensajePermiso = null
             permisoDenegado = false
             lanzarCamara()
         } else {
             // Permiso denegado: la app sigue funcionando sin foto
             permisoDenegado = true
-            mensajeAviso = "El permiso de cámara fue denegado. Puedes continuar sin agregar una foto."
-        }
-    }
-    val tomarFoto: () -> Unit = {
-        val concedido = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-            PackageManager.PERMISSION_GRANTED
-        if (concedido) {
-            lanzarCamara()
-        } else {
-            mostrarExplicacion = true
+            mensajePermiso = "El permiso de cámara fue denegado. Puedes continuar sin agregar una foto."
         }
     }
 
@@ -242,22 +207,16 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Aviso amarillo (permiso denegado u otros avisos de la foto)
-            mensajeAviso?.let { texto ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+            mensajePermiso?.let { texto ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 if (permisoDenegado) Icons.Default.Warning else Icons.Default.Info,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                contentDescription = null
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(
-                                texto,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
+                            Text(texto, style = MaterialTheme.typography.bodyMedium)
                         }
                         if (permisoDenegado) {
                             TextButton(
@@ -276,58 +235,50 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
                 }
             }
 
-            // Zona de la foto: vista previa, tomar foto y elegir de galeria
-            val tieneFoto = fotoTemporal != null || existente?.imagenPath != null
-            Column(
-                Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ImagenProducto(
-                    path = fotoTemporal ?: existente?.imagenPath,
-                    iconoVacio = Icons.Default.CameraAlt,
-                    descripcion = if (tieneFoto) "Foto del producto" else "Sin foto",
-                    modifier = Modifier.size(112.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    tamanoIcono = 40.dp
-                )
-                Text(
-                    if (tieneFoto) "Cambiar foto" else "Agregar foto",
-                    style = MaterialTheme.typography.labelLarge
-                )
-                Button(
-                    onClick = tomarFoto,
-                    modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth().heightIn(min = 48.dp)
+            // Zona de la foto
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                val fotoTomada = nuevaFoto
+                if (fotoTomada != null) {
+                    Image(
+                        bitmap = fotoTomada.asImageBitmap(),
+                        contentDescription = "Foto del producto",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(120.dp).then(Modifier)
+                    )
+                } else {
+                    ImagenProducto(
+                        path = existente?.imagenPath,
+                        iconoVacio = Icons.Default.CameraAlt,
+                        descripcion = if (existente?.imagenPath != null) "Foto del producto" else "Sin foto",
+                        modifier = Modifier.size(120.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        tamanoIcono = 40.dp
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        val ok = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED
+                        if (ok) lanzarCamara() else mostrarExplicacion = true
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Icon(Icons.Default.CameraAlt, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Tomar foto")
-                }
-                OutlinedButton(
-                    onClick = {
-                        galeriaLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
-                    modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth().heightIn(min = 48.dp)
-                ) {
-                    Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Elegir de galería")
+                    Text(if (nuevaFoto != null || existente?.imagenPath != null) "Cambiar foto" else "Tomar foto")
                 }
             }
 
             CampoTexto(
                 "Nombre *", nombre, { nombre = it },
                 if (intentoGuardar) errNombre else null,
-                placeholder = "Ej. Cuaderno A4",
                 capitalizacion = KeyboardCapitalization.Sentences,
                 maxCaracteres = 60, contador = true
             )
             CampoTexto(
                 "Descripción *", descripcion, { descripcion = it },
                 if (intentoGuardar) errDescripcion else null,
-                placeholder = "Ej. Libreta de 100 hojas, tamaño A4.",
                 capitalizacion = KeyboardCapitalization.Sentences,
                 lineas = 3, maxCaracteres = 200, contador = true
             )
@@ -354,37 +305,28 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
             }
 
             CampoTexto(
-                "Precio *", precio, { precio = it },
+                "Precio (S/) *", precio, { precio = it },
                 if (verPrecio) errPrecio else null,
-                placeholder = "0.00", prefijo = "S/ ",
                 teclado = KeyboardType.Decimal, maxCaracteres = 10
             )
+            CampoTexto(
+                "Stock *", stock, { stock = it },
+                if (verStock) errStock else null,
+                teclado = KeyboardType.Number, maxCaracteres = 6
+            )
 
-            // Stock y Disponible en la misma fila, como en el prototipo
+            // Fila completa tocable para cambiar Disponible Si/No
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.Top
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .toggleable(value = disponible, role = Role.Switch, onValueChange = { disponible = it }),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.weight(1f)) {
-                    CampoTexto(
-                        "Stock *", stock, { stock = it },
-                        if (verStock) errStock else null,
-                        placeholder = "0",
-                        teclado = KeyboardType.Number, maxCaracteres = 6
-                    )
-                }
-                Column(
-                    Modifier
-                        .heightIn(min = 48.dp)
-                        .padding(top = 4.dp)
-                        .toggleable(value = disponible, role = Role.Switch, onValueChange = { disponible = it }),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Disponible", style = MaterialTheme.typography.labelLarge)
-                    Switch(checked = disponible, onCheckedChange = null)
-                    Text(if (disponible) "Sí" else "No", style = MaterialTheme.typography.labelMedium)
-                }
+                Text("Disponible", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Text(if (disponible) "Sí" else "No", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = disponible, onCheckedChange = null)
             }
 
             Button(
@@ -402,7 +344,7 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
                                 disponible = disponible,
                                 imagenPath = existente?.imagenPath
                             ),
-                            fotoTemporal
+                            nuevaFoto
                         )
                         Toast.makeText(
                             context,
@@ -440,7 +382,7 @@ fun PantallaFormulario(vm: ProductoViewModel, productoId: Int, onVolver: () -> U
                 TextButton(onClick = {
                     mostrarExplicacion = false
                     permisoDenegado = false
-                    mensajeAviso = "Continuarás sin foto."
+                    mensajePermiso = "Continuarás sin foto."
                 }) { Text("Cancelar") }
             }
         )
@@ -469,8 +411,6 @@ private fun CampoTexto(
     valor: String,
     onCambio: (String) -> Unit,
     error: String?,
-    placeholder: String = "",
-    prefijo: String? = null,
     teclado: KeyboardType = KeyboardType.Text,
     capitalizacion: KeyboardCapitalization = KeyboardCapitalization.None,
     lineas: Int = 1,
@@ -481,15 +421,10 @@ private fun CampoTexto(
         value = valor,
         onValueChange = { if (it.length <= maxCaracteres) onCambio(it) },
         label = { Text(etiqueta) },
-        placeholder = { if (placeholder.isNotEmpty()) Text(placeholder) },
-        prefix = if (prefijo != null) ({ Text(prefijo) }) else null,
         isError = error != null,
         supportingText = {
-            if (error != null) {
-                Text(error)
-            } else if (contador) {
-                Text("${valor.length}/$maxCaracteres")
-            }
+            if (error != null) Text(error)
+            else if (contador) Text("${valor.length}/$maxCaracteres")
         },
         singleLine = lineas == 1,
         minLines = lineas,

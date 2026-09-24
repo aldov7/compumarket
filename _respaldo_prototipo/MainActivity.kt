@@ -4,16 +4,10 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.campusmarket.data.Preferencias
 import com.example.campusmarket.navegacion.AppNavegacion
-import com.example.campusmarket.ui.ProductoViewModel
 import com.example.campusmarket.ui.theme.CampusMarketTheme
 
 class MainActivity : ComponentActivity() {
@@ -24,16 +18,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Log.d(etiqueta, "onCreate (estado guardado: ${savedInstanceState != null})")
         setContent {
-            val vm: ProductoViewModel = viewModel()
-            // El tema elegido en Configuracion se guarda en SharedPreferences
-            val tema by vm.tema.collectAsStateWithLifecycle()
-            val oscuro = when (tema) {
-                Preferencias.TEMA_CLARO -> false
-                Preferencias.TEMA_OSCURO -> true
-                else -> isSystemInDarkTheme()
-            }
-            CampusMarketTheme(darkTheme = oscuro) {
-                Surface(modifier = Modifier.fillMaxSize()) { AppNavegacion(vm) }
+            CampusMarketTheme {
+                Surface(modifier = Modifier.fillMaxSize()) { AppNavegacion() }
             }
         }
     }

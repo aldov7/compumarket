@@ -7,7 +7,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Paleta verde con buen contraste. El color terciario (ambar) se usa en los avisos.
+// Paleta verde con buen contraste (texto oscuro sobre fondos claros y viceversa)
 private val EsquemaClaro = lightColorScheme(
     primary = Color(0xFF00695C),
     onPrimary = Color.White,
@@ -16,12 +16,7 @@ private val EsquemaClaro = lightColorScheme(
     secondary = Color(0xFF4A635F),
     secondaryContainer = Color(0xFFCCE8E3),
     onSecondaryContainer = Color(0xFF05201D),
-    tertiary = Color(0xFF8A5A00),
-    onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFFFE9B0),
-    onTertiaryContainer = Color(0xFF3E2A00),
     error = Color(0xFFB3261E),
-    onError = Color.White,
     errorContainer = Color(0xFFF9DEDC),
     onErrorContainer = Color(0xFF410E0B),
     background = Color(0xFFF6FBF9),
@@ -36,12 +31,7 @@ private val EsquemaOscuro = darkColorScheme(
     secondary = Color(0xFFB0CCC7),
     secondaryContainer = Color(0xFF334B47),
     onSecondaryContainer = Color(0xFFCCE8E3),
-    tertiary = Color(0xFFFFC857),
-    onTertiary = Color(0xFF432C00),
-    tertiaryContainer = Color(0xFF5F4100),
-    onTertiaryContainer = Color(0xFFFFE9B0),
     error = Color(0xFFF2B8B5),
-    onError = Color(0xFF601410),
     errorContainer = Color(0xFF8C1D18),
     onErrorContainer = Color(0xFFF9DEDC),
     background = Color(0xFF0F1614),

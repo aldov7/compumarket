@@ -12,6 +12,6 @@ data class Producto(
     val precio: Double,
     val stock: Int,
     val disponible: Boolean,
-    // Foto del producto: ruta de un archivo interno, o "res:nombre" para las imagenes de ejemplo
+    // Ruta de la foto guardada en el almacenamiento interno de la app (opcional)
     val imagenPath: String? = null
 )

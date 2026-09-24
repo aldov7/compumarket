@@ -5,14 +5,13 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
@@ -31,20 +30,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LifecycleEventObserver
@@ -52,9 +46,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
-
-// Las imagenes de ejemplo se guardan en la base de datos como "res:nombre_del_drawable"
-const val PREFIJO_RECURSO = "res:"
 
 // Categorias disponibles en el formulario y en los filtros
 val CATEGORIAS = listOf("Útiles", "Accesorios", "Tecnología", "Alimentos")
@@ -98,73 +89,33 @@ fun EtiquetaDisponibilidad(disponible: Boolean) {
     }
 }
 
-// Etiqueta con la categoria del producto (icono + texto)
-@Composable
-fun EtiquetaCategoria(categoria: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shape = RoundedCornerShape(50)
-    ) {
-        Row(
-            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(iconoCategoria(categoria), contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(categoria, style = MaterialTheme.typography.labelMedium)
-        }
-    }
-}
-
-// Muestra la imagen del producto: un recurso de ejemplo ("res:..."), una foto guardada
-// o, si no hay imagen, un icono. La foto se decodifica fuera del hilo principal.
+// Muestra la foto del producto (si existe) o un icono representativo.
+// La imagen se decodifica fuera del hilo principal para no bloquear la interfaz.
 @Composable
 fun ImagenProducto(
     path: String?,
     iconoVacio: ImageVector,
     descripcion: String,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(12.dp),
+    shape: Shape = CircleShape,
     tamanoIcono: Dp = 28.dp
 ) {
-    val context = LocalContext.current
-    val idRecurso = remember(path) {
-        if (path != null && path.startsWith(PREFIJO_RECURSO)) {
-            context.resources.getIdentifier(path.removePrefix(PREFIJO_RECURSO), "drawable", context.packageName)
-        } else {
-            0
-        }
-    }
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = path) {
-        value = if (path == null || path.startsWith(PREFIJO_RECURSO)) {
-            null
-        } else {
-            withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
+        value = if (path == null) null else withContext(Dispatchers.IO) {
+            BitmapFactory.decodeFile(path)?.asImageBitmap()
         }
     }
-    val foto = bitmap
-    val hayImagen = idRecurso != 0 || foto != null
-
-    Surface(
-        shape = shape,
-        color = if (hayImagen) Color.White else MaterialTheme.colorScheme.primaryContainer,
-        modifier = modifier
-    ) {
-        when {
-            idRecurso != 0 -> Image(
-                painter = painterResource(idRecurso),
-                contentDescription = descripcion,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(4.dp)
-            )
-            foto != null -> Image(
-                bitmap = foto,
+    Surface(shape = shape, color = MaterialTheme.colorScheme.primaryContainer, modifier = modifier) {
+        val imagen = bitmap
+        if (imagen != null) {
+            Image(
+                bitmap = imagen,
                 contentDescription = descripcion,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-            else -> Box(contentAlignment = Alignment.Center) {
+        } else {
+            Box(contentAlignment = Alignment.Center) {
                 Icon(
                     iconoVacio,
                     contentDescription = descripcion,
@@ -183,33 +134,8 @@ fun IndicadorCarga(modifier: Modifier = Modifier) {
     }
 }
 
-// Mensaje central reutilizable (lista vacia, sin resultados)
-@Composable
-fun EstadoMensaje(
-    titulo: String,
-    detalle: String,
-    modifier: Modifier = Modifier,
-    accion: @Composable () -> Unit
-) {
-    Column(
-        modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            Icons.Default.Inventory2, contentDescription = null,
-            modifier = Modifier.size(96.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(titulo, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-        Text(detalle, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
-        accion()
-    }
-}
-
 // Registra en Logcat (etiqueta "CicloVida") los eventos del ciclo de vida de cada pantalla.
+// Sirve para demostrar el ciclo de vida en el informe y en el video.
 @Composable
 fun RegistrarCicloDeVida(pantalla: String) {
     val propietario = LocalLifecycleOwner.current

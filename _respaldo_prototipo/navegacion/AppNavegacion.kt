@@ -7,8 +7,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.campusmarket.ui.PantallaAyuda
-import com.example.campusmarket.ui.PantallaConfiguracion
 import com.example.campusmarket.ui.PantallaDetalle
 import com.example.campusmarket.ui.PantallaFormulario
 import com.example.campusmarket.ui.PantallaPrincipal
@@ -20,16 +18,16 @@ object Rutas {
     const val PRINCIPAL = "principal"
     const val FORMULARIO = "formulario/{$ARG_ID}"
     const val DETALLE = "detalle/{$ARG_ID}"
-    const val CONFIGURACION = "configuracion"
-    const val AYUDA = "ayuda"
 
     fun formulario(id: Int = 0) = "formulario/$id"   // id = 0 significa "producto nuevo"
     fun detalle(id: Int) = "detalle/$id"
 }
 
 @Composable
-fun AppNavegacion(vm: ProductoViewModel = viewModel()) {
+fun AppNavegacion() {
     val nav = rememberNavController()
+    // El ViewModel vive mientras viva la Activity: sobrevive a la rotacion de pantalla
+    val vm: ProductoViewModel = viewModel()
 
     NavHost(navController = nav, startDestination = Rutas.PRINCIPAL) {
 
@@ -37,9 +35,7 @@ fun AppNavegacion(vm: ProductoViewModel = viewModel()) {
             PantallaPrincipal(
                 vm = vm,
                 onAgregar = { nav.navigate(Rutas.formulario()) { launchSingleTop = true } },
-                onDetalle = { id -> nav.navigate(Rutas.detalle(id)) { launchSingleTop = true } },
-                onConfiguracion = { nav.navigate(Rutas.CONFIGURACION) { launchSingleTop = true } },
-                onAyuda = { nav.navigate(Rutas.AYUDA) { launchSingleTop = true } }
+                onDetalle = { id -> nav.navigate(Rutas.detalle(id)) { launchSingleTop = true } }
             )
         }
 
@@ -64,14 +60,6 @@ fun AppNavegacion(vm: ProductoViewModel = viewModel()) {
                 onEditar = { id -> nav.navigate(Rutas.formulario(id)) { launchSingleTop = true } },
                 onVolver = { nav.popBackStack() }
             )
-        }
-
-        composable(Rutas.CONFIGURACION) {
-            PantallaConfiguracion(vm = vm, onVolver = { nav.popBackStack() })
-        }
-
-        composable(Rutas.AYUDA) {
-            PantallaAyuda(onVolver = { nav.popBackStack() })
         }
     }
 }
